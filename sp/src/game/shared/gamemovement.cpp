@@ -1124,6 +1124,15 @@ void CGameMovement::ReduceTimers( void )
 			player->m_flSwimSoundTime = 0;
 		}
 	}
+	// GEA
+	if (wr_lastWallTimer > 0)
+	{
+		wr_lastWallTimer -= frame_msec;
+		if (wr_lastWallTimer < 0)
+		{
+			wr_lastWallTimer = 0;
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -2024,8 +2033,6 @@ void CGameMovement::WalkMove( void )
 //-----------------------------------------------------------------------------
 void CGameMovement::FullWalkMove( )
 {
-
-#if 0
 	if ( !CheckWater() ) 
 	{
 		StartGravity();
@@ -2139,7 +2146,6 @@ void CGameMovement::FullWalkMove( )
 		player->Splash();
 #endif
 	}
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -2352,6 +2358,7 @@ void CGameMovement::PlaySwimSound()
 //-----------------------------------------------------------------------------
 bool CGameMovement::CheckJumpButton( void )
 {
+	// Check not dead
 	if (player->pl.deadflag)
 	{
 		mv->m_nOldButtons |= IN_JUMP ;	// don't jump again until released
@@ -2393,8 +2400,9 @@ bool CGameMovement::CheckJumpButton( void )
 	// No more effect
  	if (player->GetGroundEntity() == NULL && !dj_able)
 	{
-		//mv->m_nOldButtons |= IN_JUMP;
-		//return false;		// in air (GEA - with no doublejump charge), so no effect		
+
+		mv->m_nOldButtons |= IN_JUMP;
+		return false;		// in air (GEA - with no doublejump charge), so no effect		
 	}
 
 	// Don't allow jumping when the player is in a stasis field.
@@ -2417,7 +2425,7 @@ bool CGameMovement::CheckJumpButton( void )
 	// GEA - Disable doublejump upon performing one
 	if (player->GetGroundEntity() == NULL && dj_able)
 	{
-		//dj_able = false;
+		dj_able = false;
 	}
 
 	// Begin jump sequence
@@ -3051,7 +3059,7 @@ const char *DescribeAxis( int axis );
 #endif
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: ensures all velocity values are valid and within bounds
 //-----------------------------------------------------------------------------
 void CGameMovement::CheckVelocity( void )
 {
@@ -3218,6 +3226,7 @@ float CGameMovement::CalcRoll ( const QAngle &angles, const Vector &velocity, fl
 	return side*sign;
 }
 
+#pragma region Stuck_funcs
 #define CHECKSTUCK_MINTIME 0.05  // Don't check again too quickly.
 
 #if !defined(_STATIC_LINKED) || defined(CLIENT_DLL)
@@ -3463,6 +3472,7 @@ int CGameMovement::CheckStuck( void )
 
 	return 1;
 }
+#pragma endregion
 
 //-----------------------------------------------------------------------------
 // Purpose: 

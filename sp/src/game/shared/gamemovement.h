@@ -287,6 +287,7 @@ public:
 
 	// GEA
 	bool dj_able;
+	float wr_lastWallTimer;
 };
 
 
