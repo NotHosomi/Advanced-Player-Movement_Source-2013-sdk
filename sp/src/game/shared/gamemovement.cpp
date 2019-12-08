@@ -2024,11 +2024,12 @@ void CGameMovement::WalkMove( void )
 //-----------------------------------------------------------------------------
 void CGameMovement::FullWalkMove( )
 {
+
+#if 0
 	if ( !CheckWater() ) 
 	{
 		StartGravity();
 	}
-
 	// If we are leaping out of the water, just update the counters.
 	if (player->m_flWaterJumpTime)
 	{
@@ -2107,7 +2108,7 @@ void CGameMovement::FullWalkMove( )
 		}
 		else
 		{
-			//AirMove();  // Take into account movement when in air.
+			AirMove();  // Take into account movement when in air.
 		}
 
 		// Set final flags.
@@ -2138,6 +2139,7 @@ void CGameMovement::FullWalkMove( )
 		player->Splash();
 #endif
 	}
+#endif
 }
 
 //-----------------------------------------------------------------------------
