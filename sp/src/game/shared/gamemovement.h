@@ -284,6 +284,9 @@ public:
 	void			ForceDuck( void );
 
 #endif
+
+	// GEA
+	bool dj_able;
 };
 
 

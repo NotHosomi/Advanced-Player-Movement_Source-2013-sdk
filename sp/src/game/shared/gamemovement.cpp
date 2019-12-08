@@ -2392,10 +2392,10 @@ bool CGameMovement::CheckJumpButton( void )
 	}
 
 	// No more effect
- 	if (player->GetGroundEntity() == NULL)
+ 	if (player->GetGroundEntity() == NULL && !dj_able)
 	{
-		mv->m_nOldButtons |= IN_JUMP;
-		return false;		// in air, so no effect
+		//mv->m_nOldButtons |= IN_JUMP;
+		//return false;		// in air (GEA - with no doublejump charge), so no effect		
 	}
 
 	// Don't allow jumping when the player is in a stasis field.
@@ -2415,7 +2415,14 @@ bool CGameMovement::CheckJumpButton( void )
 	if ( player->m_Local.m_flDuckJumpTime > 0.0f )
 		return false;
 
+	// GEA - Disable doublejump upon performing one
+	if (player->GetGroundEntity() == NULL && dj_able)
+	{
+		//dj_able = false;
+	}
 
+	// Begin jump sequence
+	
 	// In the air now.
     SetGroundEntity( NULL );
 	
@@ -3627,6 +3634,9 @@ void CGameMovement::SetGroundEntity( trace_t *pm )
 		}
 
 		mv->m_vecVelocity.z = 0.0f;
+
+		// GEA - Grounded, so enable Doublejump again, and reset lastWallRef timer
+		dj_able = true;
 	}
 }
 
