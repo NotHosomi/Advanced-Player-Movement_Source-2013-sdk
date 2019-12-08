@@ -2081,13 +2081,13 @@ void CGameMovement::FullWalkMove( )
 	// Not fully underwater
 	{
 		// Was jump button pressed?
-		if (mv->m_nButtons & IN_JUMP)
+		if (mv->m_nButtons & IN_JUMP)	// +jump
 		{
  			CheckJumpButton();
 		}
 		else
 		{
-			mv->m_nOldButtons &= ~IN_JUMP;
+			mv->m_nOldButtons &= ~IN_JUMP;	// -jump
 		}
 
 		// Fricion is handled before we add in any base velocity. That way, if we are on a conveyor, 
@@ -2107,7 +2107,7 @@ void CGameMovement::FullWalkMove( )
 		}
 		else
 		{
-			AirMove();  // Take into account movement when in air.
+			//AirMove();  // Take into account movement when in air.
 		}
 
 		// Set final flags.
@@ -2249,7 +2249,6 @@ void CGameMovement::FullObserverMove( void )
 	TryPlayerMove();
 }
 
-
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -2338,18 +2337,16 @@ void CGameMovement::FullNoClipMove( float factor, float maxacceleration )
 	}
 }
 
-
 //-----------------------------------------------------------------------------
-// Checks to see if we should actually jump 
+// 
 //-----------------------------------------------------------------------------
 void CGameMovement::PlaySwimSound()
 {
 	MoveHelper()->StartSound( mv->GetAbsOrigin(), "Player.Swim" );
 }
 
-
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: Checks to see if we should actually jump 
 //-----------------------------------------------------------------------------
 bool CGameMovement::CheckJumpButton( void )
 {
@@ -2471,6 +2468,7 @@ bool CGameMovement::CheckJumpButton( void )
 		mv->m_vecVelocity[2] += flGroundFactor * flMul;  // 2 * gravity * height
 	}
 
+	// GLD maybe fiddle with this
 	// Add a little forward velocity based on your current forward velocity - if you are not sprinting.
 #if defined( HL2_DLL ) || defined( HL2_CLIENT_DLL )
 	if ( gpGlobals->maxClients == 1 )
