@@ -702,6 +702,9 @@ bool CGameMovement::CheckInterval( IntervalType_t type )
 	}
 }
 	
+//---------------------------------------------------------
+// NOTHING ABOVE HERE RELEVANT TO GEA
+//---------------------------------------------------------
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -1088,6 +1091,10 @@ void CGameMovement::CheckParameters( void )
 	}
 }
 
+//------------------------------------------------------//
+/* NOTHING ABOVE HERE WAS CHANGED BY GEA PARKOUR SYSTEM */
+//------------------------------------------------------//
+
 void CGameMovement::ReduceTimers( void )
 {
 	float frame_msec = 1000.0f * gpGlobals->frametime;
@@ -1131,6 +1138,14 @@ void CGameMovement::ReduceTimers( void )
 		if (wr_lastWallTimer < 0)
 		{
 			wr_lastWallTimer = 0;
+		}
+	}
+	if (wr_timer > 0)
+	{
+		wr_timer -= frame_msec;
+		if (wr_timer < 0)
+		{
+			wr_timer = 0;
 		}
 	}
 }
@@ -1182,6 +1197,7 @@ void CGameMovement::ProcessMovement( CBasePlayer *pPlayer, CMoveData *pMove )
 // 	player = NULL;
 }
 
+// NOT RELATED TO GEA
 void CGameMovement::StartTrackPredictionErrors( CBasePlayer *pPlayer )
 {
 	player = pPlayer;
@@ -1191,6 +1207,7 @@ void CGameMovement::StartTrackPredictionErrors( CBasePlayer *pPlayer )
 #endif
 }
 
+// NOT RELATED TO GEA
 void CGameMovement::FinishTrackPredictionErrors( CBasePlayer *pPlayer )
 {
 #if PREDICTION_ERROR_CHECK_LEVEL > 0
@@ -1215,6 +1232,8 @@ void CGameMovement::FinishMove( void )
 										// currently the system will overshoot, with larger damping values it won't
 #define PUNCH_SPRING_CONSTANT	65.0f	// bigger number increases the speed at which the view corrects
 
+
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Decays the punchangle toward 0,0,0.
 //			Modelled as a damped spring
@@ -1263,9 +1282,15 @@ void CGameMovement::StartGravity( void )
 	else
 		ent_gravity = 1.0;
 
+	float gea_gravMod;
+	if (onWall)
+		gea_gravMod = wr_gravityModi;
+	else
+		gea_gravMod = 1;
+
 	// Add gravity so they'll be in the correct position during movement
 	// yes, this 0.5 looks wrong, but it's not.  
-	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * 0.5 * gpGlobals->frametime );
+	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * 0.5 * gpGlobals->frametime * gea_gravMod);
 	mv->m_vecVelocity[2] += player->GetBaseVelocity()[2] * gpGlobals->frametime;
 
 	Vector temp = player->GetBaseVelocity();
@@ -1275,6 +1300,7 @@ void CGameMovement::StartGravity( void )
 	CheckVelocity();
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -1353,6 +1379,7 @@ void CGameMovement::CheckWaterJump( void )
 	}
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -1376,6 +1403,7 @@ void CGameMovement::WaterJump( void )
 	mv->m_vecVelocity[1] = player->m_vecWaterJumpVel[1];
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -1702,8 +1730,14 @@ void CGameMovement::FinishGravity( void )
 	else
 		ent_gravity = 1.0;
 
+	float gea_gravMod;
+	if (onWall)
+		gea_gravMod = wr_gravityModi;
+	else
+		gea_gravMod = 1;
+
 	// Get the correct velocity for the end of the dt 
-  	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * gpGlobals->frametime * 0.5);
+	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * gpGlobals->frametime * 0.5 * gea_gravMod);
 
 	CheckVelocity();
 }
@@ -1821,6 +1855,133 @@ bool CGameMovement::CanAccelerate()
 	return true;
 }
 
+/*---------------------------------------------------*/
+/*                    WALLRUN                        */
+/*---------------------------------------------------*/
+bool CGameMovement::ScanForWalls(){
+
+	if ((player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
+	{
+		// Can't wallrun whilst crouching
+		onWall = false;
+		return false;
+	}
+	if (mv->m_flForwardMove == 0)
+	{
+		onWall = false;
+		return false;
+	}
+
+	// select which 
+	int tracesToScan[6];
+	float z = 0; //cam angle
+	if (z >= 11.25)
+	{
+		z -= 11.25;
+		float temp = z / 22.5;
+		int angleID = floor(temp);
+
+		/* - disabled, just hardcoded below
+		for (int i = 0; i < 3; ++i)
+		{
+			// right side scans
+			tracesToScan[i] = ((angleID + 3 + i) % 16);
+		}
+		for (int i = 0; i < 3; ++i)
+		{
+			// left side scans
+			tracesToScan[i] = ((angleID + 11 + i) % 16);
+		}*/
+
+		// ordered for priority
+		// rightside scans
+		tracesToScan[5] = ((angleID + 3) % 16);
+		tracesToScan[3] = ((angleID + 4) % 16);
+		tracesToScan[1] = ((angleID + 5) % 16);
+		// leftside scans
+		tracesToScan[4] = ((angleID + 13) % 16);
+		tracesToScan[2] = ((angleID + 12) % 16);
+		tracesToScan[0] = ((angleID + 11) % 16);
+	}
+
+
+	bool traceResultsHit[16];
+	for (int i = 0; i < 16; ++i)
+	{
+		traceResultsHit[i] = false;
+	}
+
+	for (int i = 0; i < 16; ++i)
+	{
+		Vector traceStart = player->GetAbsOrigin() + Vector(0.0f, 0.0f, (GetPlayerMaxs().z + GetPlayerMins().z) * 0.5f);
+		Vector traceEnd = traceStart + getTraces(i);	// get the trace direction for this scan (i)
+		unsigned int mask = (CONTENTS_SOLID | CONTENTS_MOVEABLE | CONTENTS_WINDOW);	// bit mask of objects the player can collide with, excluding NPCs
+		trace_t tr;	// trace output
+		UTIL_TraceLine(traceStart, traceEnd, mask, player, COLLISION_GROUP_DEBRIS, &tr); // COLLISION_GROUP_DEBRIS - only collides with world and static objects
+
+		if (tr.DidHit())
+		{
+			traceResultsHit[i] = true;
+			if (!onWall)
+			{
+
+			}
+		}
+
+	}
+
+
+
+
+}
+
+void CGameMovement::WallMove(void)
+{
+
+
+}
+
+
+Vector getTraces(int id)
+{
+	Vector traceDir;
+	switch (id)
+	{
+	case 0: traceDir = Vector(17.0f, 0.0f, 0.0f);
+		break;
+	case 1: traceDir = Vector(17.0f, 8.5f, 0.0f);
+		break;
+	case 2: traceDir = Vector(17.0f, 17.0f, 0.0f);
+		break;
+	case 3: traceDir = Vector(8.5f, 17.0f, 0.0f);
+		break;
+	case 4: traceDir = Vector(0.0f, 17.0f, 0.0f);
+		break;
+	case 5: traceDir = Vector(-8.5f, 17.0f, 0.0f);
+		break;
+	case 6: traceDir = Vector(-17.0f, 17.0f, 0.0f);
+		break;
+	case 7: traceDir = Vector(-17.0f, 8.5f, 0.0f);
+		break;
+	case 8: traceDir = Vector(-17.0f, 0.0f, 0.0f);
+		break;
+	case 9: traceDir = Vector(-17.0f, -8.5f, 0.0f);
+		break;
+	case 10: traceDir = Vector(-17.0f, -17.0f, 0.0f);
+		break;
+	case 11: traceDir = Vector(-8.5f, -17.0f, 0.0f);
+		break;
+	case 12: traceDir = Vector(0.0f, -17.0f, 0.0f);
+		break;
+	case 13: traceDir = Vector(8.5f, -17.0f, 0.0f);
+		break;
+	case 14: traceDir = Vector(17.0f, -17.0f, 0.0f);
+		break;
+	case 15: traceDir = Vector(17.0f, -8.5f, 0.0f);
+		break;
+	}
+	return traceDir;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -1862,6 +2023,7 @@ void CGameMovement::Accelerate( Vector& wishdir, float wishspeed, float accel )
 	}
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Try to keep a walking player on the ground when running down slopes etc
 //-----------------------------------------------------------------------------
@@ -2148,9 +2310,7 @@ void CGameMovement::FullWalkMove( )
 	}
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
+// NOT RELATED TO GEA
 void CGameMovement::FullObserverMove( void )
 {
 	int mode = player->GetObserverMode();
@@ -2257,9 +2417,7 @@ void CGameMovement::FullObserverMove( void )
 	TryPlayerMove();
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
+// NOT RELATED TO GEA
 void CGameMovement::FullNoClipMove( float factor, float maxacceleration )
 {
 	Vector wishvel;
@@ -2345,14 +2503,15 @@ void CGameMovement::FullNoClipMove( float factor, float maxacceleration )
 	}
 }
 
-//-----------------------------------------------------------------------------
-// 
-//-----------------------------------------------------------------------------
+// NOT RELATED TO GEA
 void CGameMovement::PlaySwimSound()
 {
 	MoveHelper()->StartSound( mv->GetAbsOrigin(), "Player.Swim" );
 }
 
+/*------------------------------------------------------*/
+/*			 	 JUMP CODE - IMPORTANT                  */
+/*------------------------------------------------------*/
 //-----------------------------------------------------------------------------
 // Purpose: Checks to see if we should actually jump 
 //-----------------------------------------------------------------------------
@@ -2430,27 +2589,34 @@ bool CGameMovement::CheckJumpButton( void )
 
 	// Begin jump sequence
 	
+	// Flag that we jumped.
+	mv->m_nOldButtons |= IN_JUMP;	// don't jump again until released
+	return true;
+}
+
+void CGameMovement::groundJump(void)
+{
 	// In the air now.
-    SetGroundEntity( NULL );
-	
-	player->PlayStepSound( (Vector &)mv->GetAbsOrigin(), player->m_pSurfaceData, 1.0, true );
-	
-	MoveHelper()->PlayerSetAnimation( PLAYER_JUMP );
+	SetGroundEntity(NULL);
+
+	player->PlayStepSound((Vector &)mv->GetAbsOrigin(), player->m_pSurfaceData, 1.0, true);
+
+	MoveHelper()->PlayerSetAnimation(PLAYER_JUMP);
 
 	float flGroundFactor = 1.0f;
 	if (player->m_pSurfaceData)
 	{
-		flGroundFactor = player->m_pSurfaceData->game.jumpFactor; 
+		flGroundFactor = player->m_pSurfaceData->game.jumpFactor;
 	}
 
 	float flMul;
-	if ( g_bMovementOptimizations )
+	if (g_bMovementOptimizations)
 	{
 #if defined(HL2_DLL) || defined(HL2_CLIENT_DLL)
-		Assert( GetCurrentGravity() == 600.0f );
+		Assert(GetCurrentGravity() == 600.0f);
 		flMul = 160.0f;	// approx. 21 units.
 #else
-		Assert( GetCurrentGravity() == 800.0f );
+		Assert(GetCurrentGravity() == 800.0f);
 		flMul = 268.3281572999747f;
 #endif
 
@@ -2463,7 +2629,7 @@ bool CGameMovement::CheckJumpButton( void )
 	// Acclerate upward
 	// If we are ducking...
 	float startz = mv->m_vecVelocity[2];
-	if ( (  player->m_Local.m_bDucking ) || (  player->GetFlags() & FL_DUCKING ) )
+	if ((player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
 	{
 		// d = 0.5 * g * t^2		- distance traveled with linear accel
 		// t = sqrt(2.0 * 45 / g)	- how long to fall 45 units
@@ -2481,38 +2647,38 @@ bool CGameMovement::CheckJumpButton( void )
 	// GLD maybe fiddle with this
 	// Add a little forward velocity based on your current forward velocity - if you are not sprinting.
 #if defined( HL2_DLL ) || defined( HL2_CLIENT_DLL )
-	if ( gpGlobals->maxClients == 1 )
+	if (gpGlobals->maxClients == 1)
 	{
-		CHLMoveData *pMoveData = ( CHLMoveData* )mv;
+		CHLMoveData *pMoveData = (CHLMoveData*)mv;
 		Vector vecForward;
-		AngleVectors( mv->m_vecViewAngles, &vecForward );
+		AngleVectors(mv->m_vecViewAngles, &vecForward);
 		vecForward.z = 0;
-		VectorNormalize( vecForward );
-		
+		VectorNormalize(vecForward);
+
 		// We give a certain percentage of the current forward movement as a bonus to the jump speed.  That bonus is clipped
 		// to not accumulate over time.
-		float flSpeedBoostPerc = ( !pMoveData->m_bIsSprinting && !player->m_Local.m_bDucked ) ? 0.5f : 0.1f;
-		float flSpeedAddition = fabs( mv->m_flForwardMove * flSpeedBoostPerc );
-		float flMaxSpeed = mv->m_flMaxSpeed + ( mv->m_flMaxSpeed * flSpeedBoostPerc );
-		float flNewSpeed = ( flSpeedAddition + mv->m_vecVelocity.Length2D() );
+		float flSpeedBoostPerc = (!pMoveData->m_bIsSprinting && !player->m_Local.m_bDucked) ? 0.5f : 0.1f;
+		float flSpeedAddition = fabs(mv->m_flForwardMove * flSpeedBoostPerc);
+		float flMaxSpeed = mv->m_flMaxSpeed + (mv->m_flMaxSpeed * flSpeedBoostPerc);
+		float flNewSpeed = (flSpeedAddition + mv->m_vecVelocity.Length2D());
 
 		// If we're over the maximum, we want to only boost as much as will get us to the goal speed
-		if ( flNewSpeed > flMaxSpeed )
+		if (flNewSpeed > flMaxSpeed)
 		{
 			flSpeedAddition -= flNewSpeed - flMaxSpeed;
 		}
 
-		if ( mv->m_flForwardMove < 0.0f )
+		if (mv->m_flForwardMove < 0.0f)
 			flSpeedAddition *= -1.0f;
 
 		// Add it on
-		VectorAdd( (vecForward*flSpeedAddition), mv->m_vecVelocity, mv->m_vecVelocity );
+		VectorAdd((vecForward*flSpeedAddition), mv->m_vecVelocity, mv->m_vecVelocity);
 	}
 #endif
 
 	FinishGravity();
 
-	CheckV( player->CurrentCommandNumber(), "CheckJump", mv->m_vecVelocity );
+	CheckV(player->CurrentCommandNumber(), "CheckJump", mv->m_vecVelocity);
 
 	mv->m_outJumpVel.z += mv->m_vecVelocity[2] - startz;
 	mv->m_outStepHeight += 0.15f;
@@ -2520,7 +2686,7 @@ bool CGameMovement::CheckJumpButton( void )
 	OnJump(mv->m_outJumpVel.z);
 
 	// Set jump time.
-	if ( gpGlobals->maxClients == 1 )
+	if (gpGlobals->maxClients == 1)
 	{
 		player->m_Local.m_flJumpTime = GAMEMOVEMENT_JUMP_TIME;
 		player->m_Local.m_bInDuckJump = true;
@@ -2528,26 +2694,20 @@ bool CGameMovement::CheckJumpButton( void )
 
 #if defined( HL2_DLL )
 
-	if ( xc_uncrouch_on_jump.GetBool() )
+	if (xc_uncrouch_on_jump.GetBool())
 	{
 		// Uncrouch when jumping
-		if ( player->GetToggledDuckState() )
+		if (player->GetToggledDuckState())
 		{
 			player->ToggleDuck();
 		}
 	}
 
 #endif
-
-	// Flag that we jumped.
-	mv->m_nOldButtons |= IN_JUMP;	// don't jump again until released
-	return true;
 }
 
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
+// NOT RELATED TO GEA
 void CGameMovement::FullLadderMove()
 {
 	CheckWater();
@@ -2829,9 +2989,7 @@ int CGameMovement::TryPlayerMove( Vector *pFirstDest, trace_t *pFirstTrace )
 }
 
 
-//-----------------------------------------------------------------------------
-// Purpose: Determine whether or not the player is on a ladder (physprop or world).
-//-----------------------------------------------------------------------------
+// NOT RELATED TO GEA
 inline bool CGameMovement::OnLadder( trace_t &trace )
 {
 	if ( trace.contents & CONTENTS_LADDER )
@@ -2851,6 +3009,7 @@ inline bool CGameMovement::OnLadder( trace_t &trace )
 	return false;
 }
 
+/* NOT RELATED TO GEA */
 //=============================================================================
 // HPE_BEGIN
 // [sbodenbender] make ladders easier to climb in cstrike
@@ -2863,9 +3022,7 @@ ConVar sv_ladder_angle( "sv_ladder_angle", "-0.707", FCVAR_REPLICATED, "Cos of a
 // HPE_END
 //=============================================================================
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-//-----------------------------------------------------------------------------
+// NOT RELATED TO GEA
 bool CGameMovement::LadderMove( void )
 {
 	trace_t pm;
@@ -3028,6 +3185,7 @@ bool CGameMovement::LadderMove( void )
 	return true;
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : axis - 
@@ -3058,6 +3216,7 @@ const char *DescribeAxis( int axis )
 const char *DescribeAxis( int axis );
 #endif
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: ensures all velocity values are valid and within bounds
 //-----------------------------------------------------------------------------
@@ -3126,12 +3285,7 @@ void CGameMovement::AddGravity( void )
 	CheckVelocity();
 }
 
-
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : push - 
-// Output : trace_t
-//-----------------------------------------------------------------------------
+// NOT RELATED TO GEA
 void CGameMovement::PushEntity( Vector& push, trace_t *pTrace )
 {
 	Vector	end;
@@ -3148,7 +3302,7 @@ void CGameMovement::PushEntity( Vector& push, trace_t *pTrace )
 	}
 }	
 
-
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : in - 
@@ -3169,7 +3323,7 @@ int CGameMovement::ClipVelocity( Vector& in, Vector& normal, Vector& out, float 
 	blocked = 0x00;         // Assume unblocked.
 	if (angle > 0)			// If the plane that is blocking us has a positive z component, then assume it's a floor.
 		blocked |= 0x01;	// 
-	if (!angle)				// If the plane has no Z, it is vertical (wall/step)
+	if (!angle)				// If the plane's Z angle is 0, it is vertical (wall/step)
 		blocked |= 0x02;	// 
 	
 
@@ -3194,6 +3348,7 @@ int CGameMovement::ClipVelocity( Vector& in, Vector& normal, Vector& out, float 
 	return blocked;
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Computes roll angle for a certain movement direction and velocity
 // Input  : angles - 
@@ -3226,6 +3381,7 @@ float CGameMovement::CalcRoll ( const QAngle &angles, const Vector &velocity, fl
 	return side*sign;
 }
 
+// NOT RELATED TO GEA
 #pragma region Stuck_funcs
 #define CHECKSTUCK_MINTIME 0.05  // Don't check again too quickly.
 
@@ -3474,16 +3630,13 @@ int CGameMovement::CheckStuck( void )
 }
 #pragma endregion
 
-//-----------------------------------------------------------------------------
-// Purpose: 
-// Output : bool
-//-----------------------------------------------------------------------------
+// NOT RELATED TO GEA
 bool CGameMovement::InWater( void )
 {
 	return ( player->GetWaterLevel() > WL_Feet );
 }
 
-
+// NOT RELATED TO GEA
 void CGameMovement::ResetGetPointContentsCache()
 {
 	for ( int slot = 0; slot < MAX_PC_CACHE_SLOTS; ++slot )
@@ -3496,6 +3649,7 @@ void CGameMovement::ResetGetPointContentsCache()
 }
 
 
+/* NOT RELATED TO GEA */
 int CGameMovement::GetPointContentsCached( const Vector &point, int slot )
 {
 	if ( g_bMovementOptimizations ) 
@@ -3520,6 +3674,7 @@ int CGameMovement::GetPointContentsCached( const Vector &point, int slot )
 }
 
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : &input - 
@@ -3650,6 +3805,8 @@ void CGameMovement::SetGroundEntity( trace_t *pm )
 	}
 }
 
+
+/* NOT RELATED TO GEA */	// could use this for wall scan tho
 //-----------------------------------------------------------------------------
 // Traces the player's collision bounds in quadrants, looking for a plane that
 // can be stood upon (normal's z >= 0.7f).  Regardless of success or failure,
@@ -3721,6 +3878,7 @@ void TracePlayerBBoxForGround( const Vector& start, const Vector& end, const Vec
 	pm.endpos = endpos;
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Traces the player's collision bounds in quadrants, looking for a plane that
 // can be stood upon (normal's z >= 0.7f).  Regardless of success or failure,
@@ -3787,6 +3945,7 @@ void CGameMovement::TryTouchGroundInQuadrants( const Vector& start, const Vector
 	pm.endpos = endpos;
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : &input - 
@@ -3912,6 +4071,7 @@ void CGameMovement::CategorizePosition( void )
 	}
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Determine if the player has hit the ground while falling, apply
 //			damage, and play the appropriate impact sound.
@@ -3984,6 +4144,7 @@ void CGameMovement::CheckFalling( void )
 	player->m_Local.m_flFallVelocity = 0;
 }
 
+/* NOT RELATED TO GEA */
 void CGameMovement::PlayerRoughLandingEffects( float fvol )
 {
 	if ( fvol > 0.0 )
@@ -4011,6 +4172,7 @@ void CGameMovement::PlayerRoughLandingEffects( float fvol )
 	}
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Use for ease-in, ease-out style interpolation (accel/decel)  Used by ducking code.
 // Input  : value - 
@@ -4028,6 +4190,7 @@ float CGameMovement::SplineFraction( float value, float scale )
 	return 3 * valueSquared - 2 * valueSquared * value;
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Determine if crouch/uncrouch caused player to get stuck in world
 // Input  : direction - 
@@ -4059,6 +4222,7 @@ void CGameMovement::FixPlayerCrouchStuck( bool upward )
 	mv->SetAbsOrigin( test ); // Failed
 }
 
+/* NOT RELATED TO GEA */
 bool CGameMovement::CanUnduck()
 {
 	int i;
@@ -4095,6 +4259,7 @@ bool CGameMovement::CanUnduck()
 	return true;
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Stop ducking
 //-----------------------------------------------------------------------------
@@ -4148,6 +4313,7 @@ void CGameMovement::FinishUnDuck( void )
 	CategorizePosition();
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // 
 //-----------------------------------------------------------------------------
@@ -4170,6 +4336,7 @@ void CGameMovement::UpdateDuckJumpEyeOffset( void )
 	}
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
@@ -4206,6 +4373,7 @@ void CGameMovement::FinishUnDuckJump( trace_t &trace )
 	CategorizePosition();
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Finish ducking
 //-----------------------------------------------------------------------------
@@ -4258,6 +4426,7 @@ void CGameMovement::FinishDuck( void )
 	CategorizePosition();
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
@@ -4283,6 +4452,7 @@ void CGameMovement::StartUnDuckJump( void )
 	CategorizePosition();
 }
 
+/* NOT RELATED TO GEA */
 //
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -4303,6 +4473,7 @@ void CGameMovement::SetDuckedEyeOffset( float duckFraction )
 	player->SetViewOffset( temp );
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Crop the speed of the player when ducking and on the ground.
 //   Input: bInDuck - is the player already ducking
@@ -4321,6 +4492,7 @@ void CGameMovement::HandleDuckingSpeedCrop( void )
 	}
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: Check to see if we are in a situation where we can unduck jump.
 //-----------------------------------------------------------------------------
@@ -4348,6 +4520,7 @@ bool CGameMovement::CanUnDuckJump( trace_t &trace )
 	return false;
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: See if duck button is pressed and do the appropriate things
 //-----------------------------------------------------------------------------
@@ -4703,6 +4876,7 @@ void CGameMovement::PlayerMove( void )
 }
 
 
+/* NOT RELATED TO GEA */		// possibly
 //-----------------------------------------------------------------------------
 // Performs the collision resolution for fliers.
 //-----------------------------------------------------------------------------
@@ -4770,6 +4944,11 @@ void CGameMovement::PerformFlyCollisionResolution( trace_t &pm, Vector &move )
 		VectorSubtract( mv->m_vecVelocity, base, mv->m_vecVelocity );
 	}
 }
+
+
+//------------------------------------------------------//
+/* NOTHING BELOW HERE WAS CHANGED BY GEA PARKOUR SYSTEM */
+//------------------------------------------------------//
 
 
 //-----------------------------------------------------------------------------

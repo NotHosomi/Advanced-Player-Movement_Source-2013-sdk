@@ -251,6 +251,18 @@ protected:
 	void			TryTouchGroundInQuadrants( const Vector& start, const Vector& end, unsigned int fMask, int collisionGroup, trace_t& pm );
 
 
+	// GEA - WALLRUNNING
+	bool ScanForWalls();
+	void WallMove( void );
+	Vector getTraces(int id);
+	float wr_heightGain = 20.0f;
+	float wr_timer = 0;
+	float wr_maxDuration = 2;
+	void groundJump(void);
+	void airJump(void);
+	void wallJump(void);
+
+
 protected:
 
 	// Performs the collision resolution for fliers.
@@ -288,6 +300,9 @@ public:
 	// GEA
 	bool dj_able;
 	float wr_lastWallTimer;
+	float wr_gravityModi = 0.2f;
+	float onWall = false;
+	Vector wr_wallNormal;
 };
 
 
