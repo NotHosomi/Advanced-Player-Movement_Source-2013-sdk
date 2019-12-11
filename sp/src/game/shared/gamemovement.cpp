@@ -1734,16 +1734,22 @@ void CGameMovement::FinishGravity( void )
 		ent_gravity = 1.0;
 
 	// using player->setGravity instead
-#if 0
-	float gea_gravMod;
+#if 1
+	// Modify gravity if wallrunning
+	float wr_gravMod;
 	if (wr_timer > 0)
-		gea_gravMod = wr_gravityModi;
+	{
+		if (mv->m_vecVelocity[2] > 0)
+			wr_gravMod = wr_gravityModi1;
+		else
+			wr_gravMod = wr_gravityModi2;
+	}
 	else
-		gea_gravMod = 1;
+		wr_gravMod = 1;
 #endif
 
 	// Get the correct velocity for the end of the dt 
-	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * gpGlobals->frametime * 0.5);
+	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * gpGlobals->frametime * 0.5 * wr_gravMod);
 
 	CheckVelocity();
 }
@@ -1872,6 +1878,11 @@ bool CGameMovement::ScanForWalls(){
 		wr_timer = 0;
 		return false;
 	}
+	if (player->GetGroundEntity() != NULL)
+	{
+		// Don't wallrun if we're on the ground
+		return false;
+	}
 	if (mv->m_flForwardMove == 0)
 	{
 		// drop off the wall if not running
@@ -1893,7 +1904,6 @@ bool CGameMovement::ScanForWalls(){
 		trace_t tr;	// trace output
 		UTIL_TraceLine(traceStart, traceEnd, mask, player, COLLISION_GROUP_DEBRIS, &tr); // COLLISION_GROUP_DEBRIS - only collides with world and static objects
 		// trace hit
-		Warning(" %d. %f - ", i, tr.fraction);
 		if (tr.fraction < 1.0f)
 		{
 
@@ -1902,8 +1912,10 @@ bool CGameMovement::ScanForWalls(){
 			if (wr_timer == 0)
 			{
 				// Start new wallrun
+				Warning(" - New Wallrun\n");
 				wr_timer = wr_maxDuration;
 				mv->m_vecVelocity[2] = wr_heightGain;
+				dj_able = true;
 			}
 			
 			Vector wr_wall_n = tr.plane.normal;
@@ -1923,21 +1935,60 @@ bool CGameMovement::ScanForWalls(){
 
 void CGameMovement::WallMove(void)
 {
-	Warning("On wall - %f %f %f\n", wr_wall_n[0], wr_wall_n[1], wr_wall_n[2]);
-	Vector moveDir;
+	Vector wallDir;
 	if (wr_wallSideRight)
 	{
-		VectorYawRotate(wr_wall_n, 90, moveDir);
+		VectorYawRotate(wr_wall_n, 90, wallDir);
 	}
 	else
 	{
-		VectorYawRotate(wr_wall_n, -90, moveDir);
+		VectorYawRotate(wr_wall_n, -90, wallDir);
 	}
-	//if (velocity.z)
-	
 
+	int			i;
+	Vector		wishvel;
+	float		fmove, smove;
+	Vector		wishdir;
+	float		wishspeed;
+	Vector forward, right, up;
 
+	AngleVectors(mv->m_vecViewAngles, &forward, &right, &up);  // Determine movement angles
 
+	// Copy movement amounts
+	fmove = mv->m_flForwardMove;
+	smove = mv->m_flSideMove;
+
+	// Zero out z components of movement vectors
+	forward[2] = 0;
+	right[2] = 0;
+	VectorNormalize(forward);  // Normalize remainder of vectors
+	VectorNormalize(right);    // 
+
+	for (i = 0; i<2; i++)       // Determine x and y parts of velocity
+		wishvel[i] = forward[i] * fmove + right[i] * smove;
+	wishvel[2] = 0;             // Zero out z part of velocity
+
+	VectorCopy(wishvel, wishdir);   // Determine maginitude of speed of move
+	wishspeed = VectorNormalize(wishdir);
+
+	//
+	// clamp to server defined max speed
+	//
+	if (wishspeed != 0 && (wishspeed > mv->m_flMaxSpeed))
+	{
+		VectorScale(wishvel, mv->m_flMaxSpeed / wishspeed, wishvel);
+		wishspeed = mv->m_flMaxSpeed;
+	}
+
+	AirAccelerate(wishdir, wishspeed, sv_airaccelerate.GetFloat());
+
+	// Add in any base velocity to the current velocity.
+	VectorAdd(mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity);
+
+	TryPlayerMove();
+
+	// Now pull the base velocity back out.   Base velocity is set if you are on a moving object, like a conveyor (or maybe another monster?)
+	VectorSubtract(mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity);
 }
 
 Vector CGameMovement::getTraces(int id)
@@ -2310,7 +2361,6 @@ void CGameMovement::FullWalkMove( )
 			ScanForWalls();
 			if (wr_timer > 0)
 			{
-				Warning("wr_timer: %f", wr_timer);
 				WallMove();
 			}
 			else
@@ -2335,7 +2385,14 @@ void CGameMovement::FullWalkMove( )
 		if ( player->GetGroundEntity() != NULL )
 		{
 			mv->m_vecVelocity[2] = 0;
+		} 
+#if 0
+		// If we are wallrunning, use different gravity
+		else if (wr_timer > 0)
+		{
+			mv->m_vecVelocity[2] -= wr_gravity * gpGlobals->frametime;
 		}
+#endif
 		CheckFalling();
 	}
 
@@ -2552,7 +2609,7 @@ void CGameMovement::PlaySwimSound()
 /*			 	 JUMP CODE - IMPORTANT                  */
 /*------------------------------------------------------*/
 //-----------------------------------------------------------------------------
-// Purpose: Checks to see if we should actually jump 
+// Purpose: Checks to see if we should actually jump, and which type
 //-----------------------------------------------------------------------------
 bool CGameMovement::CheckJumpButton(void)
 {
@@ -3434,6 +3491,7 @@ void CGameMovement::CheckVelocity( void )
 	}
 }
 
+/* NOT RELATED TO GEA */
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------

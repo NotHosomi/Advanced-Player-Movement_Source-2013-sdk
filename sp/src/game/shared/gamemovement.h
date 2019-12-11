@@ -305,7 +305,8 @@ public:
 	float wr_lastWallTimer;
 	float wr_lastWallResettime = 2;
 
-	float wr_gravityModi = 0.2f;
+	float wr_gravityModi1 = 1.0f;
+	float wr_gravityModi2 = 0.2f;
 	float onWall = false;
 	Vector wr_wall_n;
 	bool wr_wallSideRight;
