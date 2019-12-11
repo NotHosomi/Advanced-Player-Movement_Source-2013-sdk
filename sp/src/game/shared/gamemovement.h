@@ -302,17 +302,19 @@ public:
 
 	// GEA
 	bool dj_able;
-	float wr_lastWallTimer;
-	float wr_lastWallResettime = 2;
+	float dj_upVel = 250;
+	float dj_horizontalVel = 0.8f;
 
+	float wr_lastWallTimer;
+	float wr_lastWallResetTime = 2000.0f;
 	float wr_gravityModi1 = 1.0f;
 	float wr_gravityModi2 = 0.2f;
 	float onWall = false;
 	Vector wr_wall_n;
 	bool wr_wallSideRight;
-	float wr_heightGain = 100.0f;
-	float wr_timer = 0;
-	float wr_maxDuration = 2;
+	float wr_heightGain = 200.0f;
+	float wr_timer = 0.0f;
+	float wr_maxDuration = 2000.0f;
 	float wr_jumpSideSpeed = 150.0f;
 	float wr_jumpUpSpeed = 100.0f;
 

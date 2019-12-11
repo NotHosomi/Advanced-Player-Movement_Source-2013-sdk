@@ -1283,17 +1283,23 @@ void CGameMovement::StartGravity( void )
 		ent_gravity = 1.0;
 
 	//using player->setGravity instead
-#if 0
-	float gea_gravMod;
+#if 1
+	// Modify gravity if wallrunning
+	float wr_gravMod;
 	if (wr_timer > 0)
-		gea_gravMod = wr_gravityModi;
+	{
+		if (mv->m_vecVelocity[2] > 0)
+			wr_gravMod = wr_gravityModi1;
+		else
+			wr_gravMod = wr_gravityModi2;
+	}
 	else
-		gea_gravMod = 1;
+		wr_gravMod = 1;
 #endif
 
 	// Add gravity so they'll be in the correct position during movement
 	// yes, this 0.5 looks wrong, but it's not.  
-	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * 0.5 * gpGlobals->frametime);
+	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * 0.5 * gpGlobals->frametime * wr_gravMod);
 	mv->m_vecVelocity[2] += player->GetBaseVelocity()[2] * gpGlobals->frametime;
 
 	Vector temp = player->GetBaseVelocity();
@@ -1875,7 +1881,12 @@ bool CGameMovement::ScanForWalls(){
 	if ((player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
 	{
 		// Can't wallrun whilst crouching
-		wr_timer = 0;
+		if (wr_timer > 0)
+		{
+			// Prematurely ended a wallrun
+			wr_timer = 0;
+			wr_lastWallTimer = wr_lastWallResetTime;
+		}
 		return false;
 	}
 	if (player->GetGroundEntity() != NULL)
@@ -1887,12 +1898,14 @@ bool CGameMovement::ScanForWalls(){
 	{
 		// drop off the wall if not running
 		// this part of the system could change
-		wr_timer = 0;
+		if (wr_timer > 0)
+		{
+			// Prematurely ended a wallrun
+			wr_timer = 0;
+			wr_lastWallTimer = wr_lastWallResetTime;
+		}
 		return false;
 	}
-	
-
-	Warning("WallScan initiated\n");
 
 	bool wallScanNoWall = true;
 	wr_wallSideRight = false;
@@ -1911,11 +1924,14 @@ bool CGameMovement::ScanForWalls(){
 			
 			if (wr_timer == 0)
 			{
-				// Start new wallrun
-				Warning(" - New Wallrun\n");
-				wr_timer = wr_maxDuration;
-				mv->m_vecVelocity[2] = wr_heightGain;
-				dj_able = true;
+				if (!(wr_lastWallTimer > 0 && tr.plane.normal != wr_wall_n))
+				{
+					// Start new wallrun
+					Warning(" - New Wallrun\n");
+					wr_timer = wr_maxDuration;
+					mv->m_vecVelocity[2] = wr_heightGain;
+					dj_able = true;
+				}
 			}
 			
 			Vector wr_wall_n = tr.plane.normal;
@@ -1928,7 +1944,13 @@ bool CGameMovement::ScanForWalls(){
 	}
 	if (wallScanNoWall)
 	{
-		wr_timer = 0;
+		Warning("No Wall\n");
+		if (wr_timer > 0)
+		{
+			// Prematurely ended a wallrun
+			wr_timer = 0;
+			wr_lastWallTimer = wr_lastWallResetTime;
+		}
 	}
 	return !wallScanNoWall;
 }
@@ -2837,8 +2859,10 @@ void CGameMovement::AirJump(void)
 	}
 
 	// Acclerate upward
-	// If we are ducking...
 	float startz = mv->m_vecVelocity[2];
+	mv->m_vecVelocity[2] = dj_upVel;
+#if 0
+	// If we are ducking...
 	if ((player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
 	{
 		// d = 0.5 * g * t^2		- distance traveled with linear accel
@@ -2853,10 +2877,11 @@ void CGameMovement::AirJump(void)
 	{
 		mv->m_vecVelocity[2] += flMul;  // 2 * gravity * height
 	}
+#endif
 
 	// GLD maybe fiddle with this
 	// Add a little forward velocity based on your current forward velocity - if you are not sprinting.
-#if defined( HL2_DLL ) || defined( HL2_CLIENT_DLL )
+#if 0 // defined( HL2_DLL ) || defined( HL2_CLIENT_DLL )
 	if (gpGlobals->maxClients == 1)
 	{
 		CHLMoveData *pMoveData = (CHLMoveData*)mv;
@@ -2872,6 +2897,8 @@ void CGameMovement::AirJump(void)
 		float flMaxSpeed = mv->m_flMaxSpeed + (mv->m_flMaxSpeed * flSpeedBoostPerc);
 		float flNewSpeed = (flSpeedAddition + mv->m_vecVelocity.Length2D());
 
+
+
 		// If we're over the maximum, we want to only boost as much as will get us to the goal speed
 		if (flNewSpeed > flMaxSpeed)
 		{
@@ -2884,6 +2911,29 @@ void CGameMovement::AirJump(void)
 		// Add it on
 		VectorAdd((vecForward*flSpeedAddition), mv->m_vecVelocity, mv->m_vecVelocity);
 	}
+#endif
+#if 1
+	float		fmove, smove;
+	Vector		wishdir;
+	Vector forward, right, up;
+
+	AngleVectors(mv->m_vecViewAngles, &forward, &right, &up);  // Determine movement angles
+
+	// Copy movement amounts
+	fmove = mv->m_flForwardMove;
+	smove = mv->m_flSideMove;
+
+	// Zero out z components of movement vectors
+	forward[2] = 0;
+	right[2] = 0;
+	VectorNormalize(forward);  // Normalize remainder of vectors
+	VectorNormalize(right);    // 
+
+	for (int i = 0; i<2; i++)       // Determine x and y parts of velocity
+		wishdir[i] = forward[i] * fmove + right[i] * smove;
+	wishdir[2] = 0;             // Zero out z part of velocity
+
+	VectorAdd((wishdir * dj_horizontalVel), mv->m_vecVelocity, mv->m_vecVelocity);
 #endif
 
 	FinishGravity();
@@ -2919,7 +2969,7 @@ void CGameMovement::AirJump(void)
 void CGameMovement::WallJump(void)
 {
 	wr_timer = 0;
-	wr_lastWallTimer = wr_lastWallResettime;
+	wr_lastWallTimer = wr_lastWallResetTime;
 
 
 	Vector m_vecWallJump = -wr_wall_n * wr_jumpSideSpeed;
