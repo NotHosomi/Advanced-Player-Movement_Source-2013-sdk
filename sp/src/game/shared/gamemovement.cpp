@@ -1282,15 +1282,18 @@ void CGameMovement::StartGravity( void )
 	else
 		ent_gravity = 1.0;
 
+	//using player->setGravity instead
+#if 0
 	float gea_gravMod;
-	if (onWall)
+	if (wr_timer > 0)
 		gea_gravMod = wr_gravityModi;
 	else
 		gea_gravMod = 1;
+#endif
 
 	// Add gravity so they'll be in the correct position during movement
 	// yes, this 0.5 looks wrong, but it's not.  
-	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * 0.5 * gpGlobals->frametime * gea_gravMod);
+	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * 0.5 * gpGlobals->frametime);
 	mv->m_vecVelocity[2] += player->GetBaseVelocity()[2] * gpGlobals->frametime;
 
 	Vector temp = player->GetBaseVelocity();
@@ -1730,14 +1733,17 @@ void CGameMovement::FinishGravity( void )
 	else
 		ent_gravity = 1.0;
 
+	// using player->setGravity instead
+#if 0
 	float gea_gravMod;
-	if (onWall)
+	if (wr_timer > 0)
 		gea_gravMod = wr_gravityModi;
 	else
 		gea_gravMod = 1;
+#endif
 
 	// Get the correct velocity for the end of the dt 
-	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * gpGlobals->frametime * 0.5 * gea_gravMod);
+	mv->m_vecVelocity[2] -= (ent_gravity * GetCurrentGravity() * gpGlobals->frametime * 0.5);
 
 	CheckVelocity();
 }
@@ -1863,88 +1869,83 @@ bool CGameMovement::ScanForWalls(){
 	if ((player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
 	{
 		// Can't wallrun whilst crouching
-		onWall = false;
+		wr_timer = 0;
 		return false;
 	}
 	if (mv->m_flForwardMove == 0)
 	{
-		onWall = false;
+		// drop off the wall if not running
+		// this part of the system could change
+		wr_timer = 0;
 		return false;
 	}
+	
 
-	// select which 
-	int tracesToScan[6];
-	float z = 0; //cam angle
-	if (z >= 11.25)
-	{
-		z -= 11.25;
-		float temp = z / 22.5;
-		int angleID = floor(temp);
+	Warning("WallScan initiated\n");
 
-		/* - disabled, just hardcoded below
-		for (int i = 0; i < 3; ++i)
-		{
-			// right side scans
-			tracesToScan[i] = ((angleID + 3 + i) % 16);
-		}
-		for (int i = 0; i < 3; ++i)
-		{
-			// left side scans
-			tracesToScan[i] = ((angleID + 11 + i) % 16);
-		}*/
-
-		// ordered for priority
-		// rightside scans
-		tracesToScan[5] = ((angleID + 3) % 16);
-		tracesToScan[3] = ((angleID + 4) % 16);
-		tracesToScan[1] = ((angleID + 5) % 16);
-		// leftside scans
-		tracesToScan[4] = ((angleID + 13) % 16);
-		tracesToScan[2] = ((angleID + 12) % 16);
-		tracesToScan[0] = ((angleID + 11) % 16);
-	}
-
-
-	bool traceResultsHit[16];
-	for (int i = 0; i < 16; ++i)
-	{
-		traceResultsHit[i] = false;
-	}
-
-	for (int i = 0; i < 16; ++i)
+	bool wallScanNoWall = true;
+	wr_wallSideRight = false;
+	for (int i = 0; i < 10; ++i)
 	{
 		Vector traceStart = player->GetAbsOrigin() + Vector(0.0f, 0.0f, (GetPlayerMaxs().z + GetPlayerMins().z) * 0.5f);
 		Vector traceEnd = traceStart + getTraces(i);	// get the trace direction for this scan (i)
 		unsigned int mask = (CONTENTS_SOLID | CONTENTS_MOVEABLE | CONTENTS_WINDOW);	// bit mask of objects the player can collide with, excluding NPCs
 		trace_t tr;	// trace output
 		UTIL_TraceLine(traceStart, traceEnd, mask, player, COLLISION_GROUP_DEBRIS, &tr); // COLLISION_GROUP_DEBRIS - only collides with world and static objects
-
-		if (tr.DidHit())
+		// trace hit
+		Warning(" %d. %f - ", i, tr.fraction);
+		if (tr.fraction < 1.0f)
 		{
-			traceResultsHit[i] = true;
-			if (!onWall)
-			{
 
+			wallScanNoWall = false;
+			
+			if (wr_timer == 0)
+			{
+				// Start new wallrun
+				wr_timer = wr_maxDuration;
+				mv->m_vecVelocity[2] = wr_heightGain;
+			}
+			
+			Vector wr_wall_n = tr.plane.normal;
+			if (i % 2)
+			{
+				wr_wallSideRight = true;
 			}
 		}
 
 	}
-
-
-
-
+	if (wallScanNoWall)
+	{
+		wr_timer = 0;
+	}
+	return !wallScanNoWall;
 }
 
 void CGameMovement::WallMove(void)
 {
+	Warning("On wall - %f %f %f\n", wr_wall_n[0], wr_wall_n[1], wr_wall_n[2]);
+	Vector moveDir;
+	if (wr_wallSideRight)
+	{
+		VectorYawRotate(wr_wall_n, 90, moveDir);
+	}
+	else
+	{
+		VectorYawRotate(wr_wall_n, -90, moveDir);
+	}
+	//if (velocity.z)
+	
+
 
 
 }
 
-
-Vector getTraces(int id)
+Vector CGameMovement::getTraces(int id)
 {
 	Vector traceDir;
+
+// GEA - decided to use a variable trace instead of constants
+#if 0
 	switch (id)
 	{
 	case 0: traceDir = Vector(17.0f, 0.0f, 0.0f);
@@ -1978,6 +1979,34 @@ Vector getTraces(int id)
 	case 14: traceDir = Vector(17.0f, -17.0f, 0.0f);
 		break;
 	case 15: traceDir = Vector(17.0f, -8.5f, 0.0f);
+		break;
+	}
+	return traceDir;
+#endif
+	// highest value will override previous results on trace success
+	switch (id)
+	{
+		// LEFT SIDE
+	case 0: VectorYawRotate(Vector(0, 23, 0), player->LocalEyeAngles().y - 10, traceDir);	
+		break;
+	case 2: VectorYawRotate(Vector(0, 23, 0), player->LocalEyeAngles().y - 5, traceDir);
+		break;
+	case 4: VectorYawRotate(Vector(0, 23, 0), player->LocalEyeAngles().y, traceDir);
+		break;
+	case 6: VectorYawRotate(Vector(0, 23, 0), player->LocalEyeAngles().y + 5, traceDir);
+		break;
+	case 8: VectorYawRotate(Vector(0, 23, 0), player->LocalEyeAngles().y + 10, traceDir);	// Highest Prio LEFT
+		break;
+		// RIGHT SIDE
+	case 1: VectorYawRotate(Vector(0, -23, 0), player->LocalEyeAngles().y + 10, traceDir);
+		break;
+	case 3: VectorYawRotate(Vector(0, -23, 0), player->LocalEyeAngles().y + 5, traceDir);
+		break;
+	case 5: VectorYawRotate(Vector(0, -23, 0), player->LocalEyeAngles().y, traceDir);
+		break;
+	case 7: VectorYawRotate(Vector(0, -23, 0), player->LocalEyeAngles().y - 5, traceDir);
+		break;
+	case 9: VectorYawRotate(Vector(0, -23, 0), player->LocalEyeAngles().y - 10, traceDir);	// Highest Prio RIGHT
 		break;
 	}
 	return traceDir;
@@ -2277,7 +2306,17 @@ void CGameMovement::FullWalkMove( )
 		}
 		else
 		{
-			AirMove();  // Take into account movement when in air.
+			// GEA TODO test this
+			ScanForWalls();
+			if (wr_timer > 0)
+			{
+				Warning("wr_timer: %f", wr_timer);
+				WallMove();
+			}
+			else
+			{
+				AirMove();  // Take into account movement when in air.
+			}
 		}
 
 		// Set final flags.
@@ -2515,12 +2554,12 @@ void CGameMovement::PlaySwimSound()
 //-----------------------------------------------------------------------------
 // Purpose: Checks to see if we should actually jump 
 //-----------------------------------------------------------------------------
-bool CGameMovement::CheckJumpButton( void )
+bool CGameMovement::CheckJumpButton(void)
 {
 	// Check not dead
 	if (player->pl.deadflag)
 	{
-		mv->m_nOldButtons |= IN_JUMP ;	// don't jump again until released
+		mv->m_nOldButtons |= IN_JUMP;	// don't jump again until released
 		return false;
 	}
 
@@ -2530,23 +2569,23 @@ bool CGameMovement::CheckJumpButton( void )
 		player->m_flWaterJumpTime -= gpGlobals->frametime;
 		if (player->m_flWaterJumpTime < 0)
 			player->m_flWaterJumpTime = 0;
-		
+
 		return false;
 	}
 
 	// If we are in the water most of the way...
-	if ( player->GetWaterLevel() >= 2 )
-	{	
+	if (player->GetWaterLevel() >= 2)
+	{
 		// swimming, not jumping
-		SetGroundEntity( NULL );
+		SetGroundEntity(NULL);
 
-		if(player->GetWaterType() == CONTENTS_WATER)    // We move up a certain amount
+		if (player->GetWaterType() == CONTENTS_WATER)    // We move up a certain amount
 			mv->m_vecVelocity[2] = 100;
 		else if (player->GetWaterType() == CONTENTS_SLIME)
 			mv->m_vecVelocity[2] = 80;
-		
+
 		// play swiming sound
-		if ( player->m_flSwimSoundTime <= 0 )
+		if (player->m_flSwimSoundTime <= 0)
 		{
 			// Don't play sound again for 1 second
 			player->m_flSwimSoundTime = 1000;
@@ -2556,45 +2595,53 @@ bool CGameMovement::CheckJumpButton( void )
 		return false;
 	}
 
-	// No more effect
- 	if (player->GetGroundEntity() == NULL && !dj_able)
+	// If in air (GEA - with no doublejump charge), early exit		
+	if (player->GetGroundEntity() == NULL && !dj_able)
 	{
-
-		mv->m_nOldButtons |= IN_JUMP;
-		return false;		// in air (GEA - with no doublejump charge), so no effect		
+		//mv->m_nOldButtons |= IN_JUMP; // disable jumpqueue blocking - can bhop by holding space before landing
+		return false;
 	}
 
 	// Don't allow jumping when the player is in a stasis field.
 #ifndef HL2_EPISODIC
-	if ( player->m_Local.m_bSlowMovement )
+	if (player->m_Local.m_bSlowMovement)
 		return false;
 #endif
 
-	if ( mv->m_nOldButtons & IN_JUMP )
+	if (mv->m_nOldButtons & IN_JUMP)
 		return false;		// don't pogo stick
 
 	// Cannot jump will in the unduck transition.
-	if ( player->m_Local.m_bDucking && (  player->GetFlags() & FL_DUCKING ) )
+	if (player->m_Local.m_bDucking && (player->GetFlags() & FL_DUCKING))
 		return false;
 
 	// Still updating the eye position.
-	if ( player->m_Local.m_flDuckJumpTime > 0.0f )
+	if (player->m_Local.m_flDuckJumpTime > 0.0f)
 		return false;
 
 	// GEA - Disable doublejump upon performing one
 	if (player->GetGroundEntity() == NULL && dj_able)
 	{
+		AirJump();
 		dj_able = false;
 	}
+	else if (wr_timer)
+	{
+		WallJump();
+	}
+	else
+	{
+		// Begin jump sequence
+		GroundJump();
+	}
 
-	// Begin jump sequence
-	
+
 	// Flag that we jumped.
 	mv->m_nOldButtons |= IN_JUMP;	// don't jump again until released
 	return true;
 }
 
-void CGameMovement::groundJump(void)
+void CGameMovement::GroundJump(void)
 {
 	// In the air now.
 	SetGroundEntity(NULL);
@@ -2706,6 +2753,133 @@ void CGameMovement::groundJump(void)
 #endif
 }
 
+void CGameMovement::AirJump(void)
+{
+	// TODO: Change to a different sound
+	player->PlayStepSound((Vector &)mv->GetAbsOrigin(), player->m_pSurfaceData, 1.0, true);
+	//enginesound->EmitAmbientSound("link/to/soundfile", 1.0f);
+
+	MoveHelper()->PlayerSetAnimation(PLAYER_JUMP);
+
+
+	float flMul;
+	if (g_bMovementOptimizations)
+	{
+#if defined(HL2_DLL) || defined(HL2_CLIENT_DLL)
+		Assert(GetCurrentGravity() == 600.0f);
+		flMul = 160.0f;	// approx. 21 units.
+#else
+		Assert(GetCurrentGravity() == 800.0f);
+		flMul = 268.3281572999747f;
+#endif
+
+	}
+	else
+	{
+		flMul = sqrt(2 * GetCurrentGravity() * GAMEMOVEMENT_JUMP_HEIGHT);
+	}
+
+	// Acclerate upward
+	// If we are ducking...
+	float startz = mv->m_vecVelocity[2];
+	if ((player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
+	{
+		// d = 0.5 * g * t^2		- distance traveled with linear accel
+		// t = sqrt(2.0 * 45 / g)	- how long to fall 45 units
+		// v = g * t				- velocity at the end (just invert it to jump up that high)
+		// v = g * sqrt(2.0 * 45 / g )
+		// v^2 = g * g * 2.0 * 45 / g
+		// v = sqrt( g * 2.0 * 45 )
+		mv->m_vecVelocity[2] = flMul;  // 2 * gravity * height
+	}
+	else
+	{
+		mv->m_vecVelocity[2] += flMul;  // 2 * gravity * height
+	}
+
+	// GLD maybe fiddle with this
+	// Add a little forward velocity based on your current forward velocity - if you are not sprinting.
+#if defined( HL2_DLL ) || defined( HL2_CLIENT_DLL )
+	if (gpGlobals->maxClients == 1)
+	{
+		CHLMoveData *pMoveData = (CHLMoveData*)mv;
+		Vector vecForward;
+		AngleVectors(mv->m_vecViewAngles, &vecForward);
+		vecForward.z = 0;
+		VectorNormalize(vecForward);
+
+		// We give a certain percentage of the current forward movement as a bonus to the jump speed.  That bonus is clipped
+		// to not accumulate over time.
+		float flSpeedBoostPerc = (!pMoveData->m_bIsSprinting && !player->m_Local.m_bDucked) ? 0.5f : 0.1f;
+		float flSpeedAddition = fabs(mv->m_flForwardMove * flSpeedBoostPerc);	// GEA TODO: Change forwardmove to wishDir
+		float flMaxSpeed = mv->m_flMaxSpeed + (mv->m_flMaxSpeed * flSpeedBoostPerc);
+		float flNewSpeed = (flSpeedAddition + mv->m_vecVelocity.Length2D());
+
+		// If we're over the maximum, we want to only boost as much as will get us to the goal speed
+		if (flNewSpeed > flMaxSpeed)
+		{
+			flSpeedAddition -= flNewSpeed - flMaxSpeed;
+		}
+
+		if (mv->m_flForwardMove < 0.0f)
+			flSpeedAddition *= -1.0f;
+
+		// Add it on
+		VectorAdd((vecForward*flSpeedAddition), mv->m_vecVelocity, mv->m_vecVelocity);
+	}
+#endif
+
+	FinishGravity();
+
+	CheckV(player->CurrentCommandNumber(), "CheckJump", mv->m_vecVelocity);
+
+	mv->m_outJumpVel.z = mv->m_vecVelocity[2] - startz;
+	mv->m_outStepHeight += 0.15f;
+
+	OnAirJump(mv->m_outJumpVel.z);
+
+	// Set jump time.
+	if (gpGlobals->maxClients == 1)
+	{
+		player->m_Local.m_flJumpTime = GAMEMOVEMENT_JUMP_TIME;
+		player->m_Local.m_bInDuckJump = true;
+	}
+
+#if defined( HL2_DLL )
+
+	if (xc_uncrouch_on_jump.GetBool())
+	{
+		// Uncrouch when jumping
+		if (player->GetToggledDuckState())
+		{
+			player->ToggleDuck();
+		}
+	}
+
+#endif
+}
+
+void CGameMovement::WallJump(void)
+{
+	wr_timer = 0;
+	wr_lastWallTimer = wr_lastWallResettime;
+
+
+	Vector m_vecWallJump = -wr_wall_n * wr_jumpSideSpeed;
+	m_vecWallJump[2] += wr_jumpUpSpeed;
+
+	float startZ = mv->m_vecVelocity[2];
+	VectorAdd(m_vecWallJump, mv->m_vecVelocity, mv->m_vecVelocity);
+
+	FinishGravity();
+
+	CheckV(player->CurrentCommandNumber(), "CheckJump", mv->m_vecVelocity);
+
+	// Virtual function to allow derived classes to respond to this event
+	mv->m_outJumpVel.z = mv->m_vecVelocity[2] - startZ;
+	mv->m_outStepHeight += 0.15f;
+	OnWallJump(mv->m_outJumpVel.z);
+}
 
 // NOT RELATED TO GEA
 void CGameMovement::FullLadderMove()
@@ -3802,6 +3976,8 @@ void CGameMovement::SetGroundEntity( trace_t *pm )
 
 		// GEA - Grounded, so enable Doublejump again, and reset lastWallRef timer
 		dj_able = true;
+		wr_timer = 0;
+		wr_lastWallTimer = 0;
 	}
 }
 
