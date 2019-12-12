@@ -317,6 +317,8 @@ public:
 	float wr_maxDuration = 2000.0f;
 	float wr_jumpSideSpeed = 150.0f;
 	float wr_jumpUpSpeed = 100.0f;
+	float wr_accel = 150.0f;
+	float wr_speed = 200.0f;
 
 };
 

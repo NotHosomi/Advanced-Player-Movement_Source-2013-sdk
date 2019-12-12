@@ -1928,7 +1928,8 @@ bool CGameMovement::ScanForWalls(){
 					if (wr_lastWallTimer == 0)
 					{
 						// Start new wallrun
-						Warning("New Wallrun on same wall");
+						Warning("New Wallrun on same wall\n");
+						Warning("Plane Normal: %f, %f, %f\n", tr.plane.normal[0], tr.plane.normal[1], tr.plane.normal[2]);
 						wr_timer = wr_maxDuration;
 						mv->m_vecVelocity[2] = wr_heightGain;
 						dj_able = true;
@@ -1937,7 +1938,8 @@ bool CGameMovement::ScanForWalls(){
 				else
 				{
 					// Start new wallrun
-					Warning("New Wallrun on new wall");
+					Warning("New Wallrun on new wall\n");
+					Warning("Plane Normal: %f, %f, %f\n", tr.plane.normal[0], tr.plane.normal[1], tr.plane.normal[2]);
 					wr_timer = wr_maxDuration;
 					mv->m_vecVelocity[2] = wr_heightGain;
 					dj_able = true;
@@ -1947,18 +1949,17 @@ bool CGameMovement::ScanForWalls(){
 			{
 				if (tr.plane.normal != wr_wall_n)
 				{
-					Warning("Extend Wallrun");
+					Warning("Extend Wallrun\n");
+
 					wr_timer = wr_maxDuration;
 
 				}
 			}
-			
-			Vector wr_wall_n = tr.plane.normal;
+			wr_wall_n = tr.plane.normal;
 			if (i % 2)
 			{
 				wr_wallSideRight = true;
 			}
-			Warning("\n");
 		}
 
 	}
@@ -1980,13 +1981,17 @@ void CGameMovement::WallMove(void)
 	Vector wallDir;
 	if (wr_wallSideRight)
 	{
-		VectorYawRotate(wr_wall_n, 90, wallDir);
+		VectorYawRotate(wr_wall_n, -90, wallDir);
 	}
 	else
 	{
-		VectorYawRotate(wr_wall_n, -90, wallDir);
+		VectorYawRotate(wr_wall_n, 90, wallDir);
 	}
 
+	//Warning("WallMove\n Wall Normal: %f, %f, %f\n", wr_wall_n[0], wr_wall_n[1], wr_wall_n[2]);
+	//Warning(" WallmoveDir: %f, %f, %f\n", wallDir[0], wallDir[1], wallDir[2]);
+
+#if 0
 	int			i;
 	Vector		wishvel;
 	float		fmove, smove;
@@ -2021,8 +2026,21 @@ void CGameMovement::WallMove(void)
 		VectorScale(wishvel, mv->m_flMaxSpeed / wishspeed, wishvel);
 		wishspeed = mv->m_flMaxSpeed;
 	}
+#endif
+#if 0
+	float		wishspeed;
+	Vector		wishdir;
+	VectorCopy(wallDir, wishdir);
+	wishspeed = VectorNormalize(wishdir);
+	if (wishspeed != 0 && (wishspeed > mv->m_flMaxSpeed))
+	{
+		VectorScale(wallDir, mv->m_flMaxSpeed / wishspeed, wallDir);
+		wishspeed = mv->m_flMaxSpeed;
+	}
+	AirAccelerate(wishdir, wishspeed, wr_accel);
+#endif
 
-	AirAccelerate(wishdir, wishspeed, sv_airaccelerate.GetFloat());
+	AirAccelerate(wallDir, wr_speed, wr_accel);
 
 	// Add in any base velocity to the current velocity.
 	VectorAdd(mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity);
@@ -2694,8 +2712,8 @@ bool CGameMovement::CheckJumpButton(void)
 		return false;
 	}
 
-	// If in air (GEA - with no doublejump charge), early exit		
-	if (player->GetGroundEntity() == NULL && !dj_able)
+	// If in air with no doublejump charge, early exit		
+	if (player->GetGroundEntity() == NULL && !dj_able && wr_timer == 0)
 	{
 		//mv->m_nOldButtons |= IN_JUMP; // disable jumpqueue blocking - can bhop by holding space before landing
 		return false;
@@ -2718,15 +2736,17 @@ bool CGameMovement::CheckJumpButton(void)
 	if (player->m_Local.m_flDuckJumpTime > 0.0f)
 		return false;
 
-	// GEA - Disable doublejump upon performing one
-	if (player->GetGroundEntity() == NULL && dj_able)
-	{
-		AirJump();
-		dj_able = false;
-	}
-	else if (wr_timer)
+	// If on wall, Walljump
+	// If in Air, AirJump
+	// Else on ground, GroundJump
+	if (wr_timer > 0)
 	{
 		WallJump();
+	}
+	else if (player->GetGroundEntity() == NULL)
+	{
+		AirJump();
+		dj_able = false; // GEA - Disable doublejump upon performing one
 	}
 	else
 	{
@@ -2988,6 +3008,7 @@ void CGameMovement::AirJump(void)
 
 void CGameMovement::WallJump(void)
 {
+	Warning("WallJump\n");
 	wr_timer = 0;
 	wr_lastWallTimer = wr_lastWallResetTime;
 
