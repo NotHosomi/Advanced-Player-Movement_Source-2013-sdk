@@ -3013,7 +3013,7 @@ void CGameMovement::WallJump(void)
 	wr_lastWallTimer = wr_lastWallResetTime;
 
 
-	Vector m_vecWallJump = -wr_wall_n * wr_jumpSideSpeed;
+	Vector m_vecWallJump = wr_wall_n * wr_jumpSideSpeed;
 	m_vecWallJump[2] += wr_jumpUpSpeed;
 
 	float startZ = mv->m_vecVelocity[2];
