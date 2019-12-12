@@ -303,7 +303,7 @@ public:
 	// GEA
 	bool dj_able;
 	float dj_upVel = 250;
-	float dj_horizontalVel = 0.8f;
+	float dj_horizontalVel = 0.4f;
 
 	float wr_lastWallTimer;
 	float wr_lastWallResetTime = 2000.0f;

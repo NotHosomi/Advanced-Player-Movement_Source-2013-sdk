@@ -1878,6 +1878,11 @@ bool CGameMovement::CanAccelerate()
 /*---------------------------------------------------*/
 bool CGameMovement::ScanForWalls(){
 
+	if (player->GetGroundEntity() != NULL)
+	{
+		// Don't wallrun if we're on the ground
+		return false;
+	}
 	if ((player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
 	{
 		// Can't wallrun whilst crouching
@@ -1887,11 +1892,6 @@ bool CGameMovement::ScanForWalls(){
 			wr_timer = 0;
 			wr_lastWallTimer = wr_lastWallResetTime;
 		}
-		return false;
-	}
-	if (player->GetGroundEntity() != NULL)
-	{
-		// Don't wallrun if we're on the ground
 		return false;
 	}
 	if (mv->m_flForwardMove == 0)
@@ -1921,16 +1921,35 @@ bool CGameMovement::ScanForWalls(){
 		{
 
 			wallScanNoWall = false;
-			
 			if (wr_timer == 0)
 			{
-				if (!(wr_lastWallTimer > 0 && tr.plane.normal != wr_wall_n))
+				if (tr.plane.normal == wr_wall_n)
+				{
+					if (wr_lastWallTimer == 0)
+					{
+						// Start new wallrun
+						Warning("New Wallrun on same wall");
+						wr_timer = wr_maxDuration;
+						mv->m_vecVelocity[2] = wr_heightGain;
+						dj_able = true;
+					}
+				}
+				else
 				{
 					// Start new wallrun
-					Warning(" - New Wallrun\n");
+					Warning("New Wallrun on new wall");
 					wr_timer = wr_maxDuration;
 					mv->m_vecVelocity[2] = wr_heightGain;
 					dj_able = true;
+				}
+			}
+			else
+			{
+				if (tr.plane.normal != wr_wall_n)
+				{
+					Warning("Extend Wallrun");
+					wr_timer = wr_maxDuration;
+
 				}
 			}
 			
@@ -1939,6 +1958,7 @@ bool CGameMovement::ScanForWalls(){
 			{
 				wr_wallSideRight = true;
 			}
+			Warning("\n");
 		}
 
 	}
