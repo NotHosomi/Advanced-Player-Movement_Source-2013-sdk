@@ -116,3 +116,32 @@ ConVar r_JeepViewZHeight( "r_JeepViewZHeight", "10.0", FCVAR_CHEAT | FCVAR_NOTIF
 ConVar r_AirboatViewDampenFreq( "r_AirboatViewDampenFreq", "7.0", FCVAR_CHEAT | FCVAR_NOTIFY | FCVAR_REPLICATED );
 ConVar r_AirboatViewDampenDamp( "r_AirboatViewDampenDamp", "1.0", FCVAR_CHEAT | FCVAR_NOTIFY | FCVAR_REPLICATED);
 ConVar r_AirboatViewZHeight( "r_AirboatViewZHeight", "0.0", FCVAR_CHEAT | FCVAR_NOTIFY | FCVAR_REPLICATED );
+
+// GEA-17026981 convars
+ConVar dj_enabled("dj_enabled", "1", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "");
+ConVar dj_up("dj_up", "250.0", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Vertical velocity of a doublejump");
+ConVar dj_horizontal("wr_horizontal", "0.5", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Flat directional velocity of a doublejump");
+ConVar wr_resettime("wr_resettime", "2000.0", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "How long before you can reattached to the same wall in milliseconds");
+ConVar wr_gravity1("wr_gravity1", "1.0", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Initial gravity during a wallrun");
+ConVar wr_gravity2("wr_gravity2", "0.2", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Stage 2 gravity of a wallrun");
+ConVar wr_height("wr_height", "200.0", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Vertical velocity at the start of the wallrun");
+ConVar wr_maxtime("wr_maxtime", "2000.0", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Maximum duration of the wallrun  in milliseconds");
+ConVar wr_jumpupvel("wr_jumpupvel", "100", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Vertical velocity of a walljump");
+ConVar wr_jumpsidevel("wr_jumpsidevel", "150", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Wall normal velocity of a walljump");
+ConVar wr_acceleration("wr_acceleration", "150", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "");
+ConVar wr_speed("wr_speed", "200", FCVAR_ARCHIVE | FCVAR_NOTIFY | FCVAR_REPLICATED, "Max speed during a wallrun");
+/*
+bool dj_able;
+float dj_upVel = 250;
+float dj_horizontalVel = 0.4f;
+
+float wr_lastWallResetTime = 2000.0f;
+float wr_gravityModi1 = 1.0f;
+float wr_gravityModi2 = 0.2f
+float wr_heightGain = 200.0f;
+float wr_maxDuration = 2000.0f;
+float wr_jumpSideSpeed = 150.0f;
+float wr_jumpUpSpeed = 100.0f;
+float wr_accel = 150.0f;
+float wr_speed = 200.0f;
+*/

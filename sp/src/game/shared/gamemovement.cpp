@@ -1289,9 +1289,9 @@ void CGameMovement::StartGravity( void )
 	if (wr_timer > 0)
 	{
 		if (mv->m_vecVelocity[2] > 0)
-			wr_gravMod = wr_gravityModi1;
+			wr_gravMod = wr_gravity1.GetFloat();
 		else
-			wr_gravMod = wr_gravityModi2;
+			wr_gravMod = wr_gravity2.GetFloat();
 	}
 	else
 		wr_gravMod = 1;
@@ -1746,9 +1746,9 @@ void CGameMovement::FinishGravity( void )
 	if (wr_timer > 0)
 	{
 		if (mv->m_vecVelocity[2] > 0)
-			wr_gravMod = wr_gravityModi1;
+			wr_gravMod = wr_gravity1.GetFloat();
 		else
-			wr_gravMod = wr_gravityModi2;
+			wr_gravMod = wr_gravity2.GetFloat();
 	}
 	else
 		wr_gravMod = 1;
@@ -1890,7 +1890,7 @@ bool CGameMovement::ScanForWalls(){
 		{
 			// Prematurely ended a wallrun
 			wr_timer = 0;
-			wr_lastWallTimer = wr_lastWallResetTime;
+			wr_lastWallTimer = wr_resettime.GetFloat();
 		}
 		return false;
 	}
@@ -1902,7 +1902,7 @@ bool CGameMovement::ScanForWalls(){
 		{
 			// Prematurely ended a wallrun
 			wr_timer = 0;
-			wr_lastWallTimer = wr_lastWallResetTime;
+			wr_lastWallTimer = wr_resettime.GetFloat();
 		}
 		return false;
 	}
@@ -1930,8 +1930,8 @@ bool CGameMovement::ScanForWalls(){
 						// Start new wallrun
 						Warning("New Wallrun on same wall\n");
 						Warning("Plane Normal: %f, %f, %f\n", tr.plane.normal[0], tr.plane.normal[1], tr.plane.normal[2]);
-						wr_timer = wr_maxDuration;
-						mv->m_vecVelocity[2] = wr_heightGain;
+						wr_timer = wr_maxtime.GetFloat();
+						mv->m_vecVelocity[2] = wr_height.GetFloat();
 						dj_able = true;
 					}
 				}
@@ -1940,8 +1940,8 @@ bool CGameMovement::ScanForWalls(){
 					// Start new wallrun
 					Warning("New Wallrun on new wall\n");
 					Warning("Plane Normal: %f, %f, %f\n", tr.plane.normal[0], tr.plane.normal[1], tr.plane.normal[2]);
-					wr_timer = wr_maxDuration;
-					mv->m_vecVelocity[2] = wr_heightGain;
+					wr_timer = wr_maxtime.GetFloat();
+					mv->m_vecVelocity[2] = wr_height.GetFloat();
 					dj_able = true;
 				}
 			}
@@ -1951,7 +1951,7 @@ bool CGameMovement::ScanForWalls(){
 				{
 					Warning("Extend Wallrun\n");
 
-					wr_timer = wr_maxDuration;
+					wr_timer = wr_maxtime.GetFloat();
 
 				}
 			}
@@ -1970,7 +1970,7 @@ bool CGameMovement::ScanForWalls(){
 		{
 			// Prematurely ended a wallrun
 			wr_timer = 0;
-			wr_lastWallTimer = wr_lastWallResetTime;
+			wr_lastWallTimer = wr_resettime.GetFloat();
 		}
 	}
 	return !wallScanNoWall;
@@ -1978,6 +1978,9 @@ bool CGameMovement::ScanForWalls(){
 
 void CGameMovement::WallMove(void)
 {
+	// TODO: get wall material
+	//player->PlayStepSound((Vector &)mv->GetAbsOrigin(), player->m_pSurfaceData, 1.0, true);
+
 	Vector wallDir;
 	if (wr_wallSideRight)
 	{
@@ -2040,7 +2043,7 @@ void CGameMovement::WallMove(void)
 	AirAccelerate(wishdir, wishspeed, wr_accel);
 #endif
 
-	AirAccelerate(wallDir, wr_speed, wr_accel);
+	AirAccelerate(wallDir, wr_speed.GetFloat(), wr_acceleration.GetFloat());
 
 	// Add in any base velocity to the current velocity.
 	VectorAdd(mv->m_vecVelocity, player->GetBaseVelocity(), mv->m_vecVelocity);
@@ -2743,7 +2746,7 @@ bool CGameMovement::CheckJumpButton(void)
 	{
 		WallJump();
 	}
-	else if (player->GetGroundEntity() == NULL)
+	else if (player->GetGroundEntity() == NULL && dj_enabled.GetInt() == 1)
 	{
 		AirJump();
 		dj_able = false; // GEA - Disable doublejump upon performing one
@@ -2900,7 +2903,7 @@ void CGameMovement::AirJump(void)
 
 	// Acclerate upward
 	float startz = mv->m_vecVelocity[2];
-	mv->m_vecVelocity[2] = dj_upVel;
+	mv->m_vecVelocity[2] = dj_up.GetFloat();
 #if 0
 	// If we are ducking...
 	if ((player->m_Local.m_bDucking) || (player->GetFlags() & FL_DUCKING))
@@ -2973,7 +2976,7 @@ void CGameMovement::AirJump(void)
 		wishdir[i] = forward[i] * fmove + right[i] * smove;
 	wishdir[2] = 0;             // Zero out z part of velocity
 
-	VectorAdd((wishdir * dj_horizontalVel), mv->m_vecVelocity, mv->m_vecVelocity);
+	VectorAdd((wishdir * dj_horizontal.GetFloat()), mv->m_vecVelocity, mv->m_vecVelocity);
 #endif
 
 	FinishGravity();
@@ -3010,11 +3013,11 @@ void CGameMovement::WallJump(void)
 {
 	Warning("WallJump\n");
 	wr_timer = 0;
-	wr_lastWallTimer = wr_lastWallResetTime;
+	wr_lastWallTimer = wr_resettime.GetFloat();
 
 
-	Vector m_vecWallJump = wr_wall_n * wr_jumpSideSpeed;
-	m_vecWallJump[2] += wr_jumpUpSpeed;
+	Vector m_vecWallJump = wr_wall_n * wr_jumpsidevel.GetFloat();
+	m_vecWallJump[2] += wr_jumpupvel.GetFloat();
 
 	float startZ = mv->m_vecVelocity[2];
 	VectorAdd(m_vecWallJump, mv->m_vecVelocity, mv->m_vecVelocity);

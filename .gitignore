@@ -60,3 +60,7 @@ sp/game/mod_hl2/bin/bin.lnk
 sp/game/mod_hl2/bin/game_shader_dx9.dll
 
 sp/game/mod_hl2/bin/game_shader_dx9.pdb
+
+sp/game/mod_hl2/cfg/cfg.lnk
+
+*.lnk

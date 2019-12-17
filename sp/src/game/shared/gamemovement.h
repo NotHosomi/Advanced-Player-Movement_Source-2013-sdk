@@ -302,23 +302,27 @@ public:
 
 	// GEA
 	bool dj_able;
-	float dj_upVel = 250;
-	float dj_horizontalVel = 0.4f;
-
-	float wr_lastWallTimer;
-	float wr_lastWallResetTime = 2000.0f;
-	float wr_gravityModi1 = 1.0f;
-	float wr_gravityModi2 = 0.2f;
 	float onWall = false;
 	Vector wr_wall_n;
 	bool wr_wallSideRight;
-	float wr_heightGain = 200.0f;
+	float wr_lastWallTimer;
 	float wr_timer = 0.0f;
+	// replaced with convars for editablility -- see movevars_shared.h
+	/*
+	float dj_upVel = 250;
+	float dj_horizontalVel = 0.4f;
+
+	float wr_lastWallResetTime = 2000.0f;
+	float wr_gravityModi1 = 1.0f;
+	float wr_gravityModi2 = 0.2f;
+	float wr_heightGain = 200.0f;
 	float wr_maxDuration = 2000.0f;
 	float wr_jumpSideSpeed = 150.0f;
 	float wr_jumpUpSpeed = 100.0f;
 	float wr_accel = 150.0f;
 	float wr_speed = 200.0f;
+	*/
+
 
 };
 

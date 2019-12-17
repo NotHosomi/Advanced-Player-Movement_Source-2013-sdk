@@ -50,4 +50,17 @@ extern ConVar r_AirboatViewDampenFreq;
 extern ConVar r_AirboatViewDampenDamp;
 extern ConVar r_AirboatViewZHeight;
 
+// GEA-17026981 convars
+extern ConVar dj_enabled;
+extern ConVar dj_up;
+extern ConVar dj_horizontal;
+extern ConVar wr_resettime;
+extern ConVar wr_gravity1;
+extern ConVar wr_gravity2;
+extern ConVar wr_height;
+extern ConVar wr_maxtime;
+extern ConVar wr_jumpupvel;
+extern ConVar wr_jumpsidevel;
+extern ConVar wr_acceleration;
+extern ConVar wr_speed;
 #endif // MOVEVARS_SHARED_H
